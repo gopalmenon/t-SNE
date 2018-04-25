@@ -43,9 +43,9 @@ get_entropy_at_i <- function(point_i_index, density, high_dimensional_data) {
                                           high_dimensional_data=high_dimensional_data, 
                                           density_at_i=density)
   
-  normalized_similarity_at_i <- un_normalized_similarity_at_i / sum(exp(-1 * colSums((high_dimensional_data[point_i_index, ] - high_dimensional_data[-point_i_index, ])^2)/(2 * density ^ 2)))
+  normalized_similarity_at_i <- unlist(un_normalized_similarity_at_i) / sum(unlist(un_normalized_similarity_at_i))
 
-  entropy_at_i <- sum(normalized_similarity_at_i * log2(normalized_similarity_at_i))
+  entropy_at_i <- sum(-normalized_similarity_at_i * log2(normalized_similarity_at_i))
 
 }
 
@@ -112,6 +112,7 @@ get_density_at_i <- function(perplexity, point_i_index, high_dimensional_data) {
   density_range_low <- density_range[1]
   density_range_high <- density_range[2]
   next_test_density <- 0.0
+  log_perplexity <- log2(perplexity)
   
   # Do binary search to get density corresponding to perplexity
   repeat {
@@ -133,5 +134,19 @@ get_density_at_i <- function(perplexity, point_i_index, high_dimensional_data) {
   }
   
   return(next_test_density)
+  
+}
+
+## Get density corresponding to perplexity at each point
+## perplexity: required perplexity 
+## high_dimensional_data: data to be visualized
+##
+## Will return a density vector corresponding to perplexity
+get_density_at_each_point <- function(perplexity, high_dimensional_data) {
+  
+  return(unlist(lapply(seq(1: length(high_dimensional_data[, 1])), 
+                       get_density_at_i, 
+                       perplexity=perplexity,
+                       high_dimensional_data=high_dimensional_data)))
   
 }
