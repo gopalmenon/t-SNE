@@ -25,7 +25,11 @@ get_initial_solution <- function(number_of_points, dimensionality, variance=INIT
 ## Will return the un-normalized similarity of point j to point i
 get_un_normalized_similarity_j_to_i <- function(point_j_index, point_i_index, high_dimensional_data, density_at_i) {
   
-  return(exp(-1 * sum((high_dimensional_data[point_i_index, ] - high_dimensional_data[point_j_index, ])^2)/(2 * density_at_i ^ 2)))
+  if (point_j_index == point_i_index) {
+    return(0.0)
+  } else {
+    return(exp(-1 * sum((high_dimensional_data[point_i_index, ] - high_dimensional_data[point_j_index, ])^2)/(2 * density_at_i ^ 2)))
+  }
   
 }
 
@@ -148,5 +152,39 @@ get_density_at_each_point <- function(perplexity, high_dimensional_data) {
                        get_density_at_i, 
                        perplexity=perplexity,
                        high_dimensional_data=high_dimensional_data)))
+  
+}
+
+## Get high dimensional pairwise affinities with perplexity
+## perplexity: required perplexity 
+## high_dimensional_data: data to be visualized
+##
+## Will return high dimensional pairwise affinities
+get_high_dimensional_pairwise_affinities <- function(perplexity, high_dimensional_data) {
+  
+  point_i_index <- matrix(data=rep(seq(1:length(high_dimensional_data[,1])),length(high_dimensional_data[,1])),
+                          nrow=length(high_dimensional_data[,1]),
+                          ncol=length(high_dimensional_data[,1]),
+                          byrow=FALSE)
+  
+  point_j_index <- matrix(data=rep(seq(1:length(high_dimensional_data[,1])),length(high_dimensional_data[,1])),
+                          nrow=length(high_dimensional_data[,1]),
+                          ncol=length(high_dimensional_data[,1]),
+                          byrow=TRUE)
+  
+  density_at_i <- get_density_at_each_point(perplexity, high_dimensional_data)
+  density_at_i_matrix <- matrix(rep(den, length(high_dimensional_data[,1])), 
+                                nrow=length(high_dimensional_data[,1]), 
+                                ncol=length(high_dimensional_data[,1]),
+                                byrow=FALSE)
+  
+  un_normalized_pairwise_affinities <- unlist(mapply(get_un_normalized_similarity_j_to_i, 
+                                                     point_j_index=c(t(point_j_index)), 
+                                                     point_i_index=c(t(point_i_index)),
+                                                     high_dimensional_data=list(high_dimensional_data),
+                                                     c(t(density_at_i_matrix))))
+  
+  return(un_normalized_pairwise_affinities)
+  
   
 }
