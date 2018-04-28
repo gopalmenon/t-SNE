@@ -201,7 +201,54 @@ get_high_dimensional_pairwise_affinities <- function(perplexity, high_dimensiona
                                               nrow=length(high_dimensional_data[,1]),
                                               ncol=length(high_dimensional_data[,1]))
   
-  return(un_normalized_pairwise_affinities/rowSums(un_normalized_pairwise_affinities))
+  normalized_pairwise_affinities <- un_normalized_pairwise_affinities/rowSums(un_normalized_pairwise_affinities)
+  return(get_symmetrized_high_dimensional_pairwise_affinities(high_dimensional_pairwise_affinities=normalized_pairwise_affinities,
+                                                              number_of_points=length(high_dimensional_data[,1])))
+  
+}
+
+## Get symmetrized affinity for a pair of points
+## affinity_i_j: high dimensional affinity between point i and j
+## affinity_j_i: high dimensional affinity between point j and i
+##
+## Will return symmetrized symmetrized affinity for a pair of points defined as Pij = (Pj|i + Pi|j)/2n
+get_symmetrized_affinity <- function(affinity_i_j, affinity_j_i, number_of_points) {
+  
+  if (is.na(affinity_i_j) || is.na(affinity_j_i)) {
+    return(0.0)
+  } else {
+    return((affinity_i_j + affinity_j_i)/(2 * number_of_points))
+  }
+  
+}
+
+## Get symmetrized high dimensional pairwise affinities
+## high_dimensional_pairwise_affinities: high dimensional pairwise affinities
+##
+## Will return symmetrized high dimensional pairwise affinities defined as Pij = (Pj|i + Pi|j)/2n
+get_symmetrized_high_dimensional_pairwise_affinities <- function(high_dimensional_pairwise_affinities, number_of_points) {
+  
+  # Get transpose of pairwise affinities and make it upper triangular so that symmetrized computation
+  # can be done for corresponding elements.
+  corr_high_dimensional_pairwise_affinities = t(high_dimensional_pairwise_affinities)
+  
+  
+  lower_triangular <- matrix(rep(1, (number_of_points * number_of_points)), 
+                             nrow=length(low_dimensional_data[,1]), 
+                             ncol=length(low_dimensional_data[,1]))
+  
+  lower_triangular <- lower.tri(upper_triangular, diag = FALSE)
+  
+  high_dimensional_pairwise_affinities[lower_triangular] <- NA
+  corr_high_dimensional_pairwise_affinities[lower_triangular] <- NA
+  
+  return(matrix(mapply(get_symmetrized_affinity, 
+                       affinity_i_j=c(t(high_dimensional_pairwise_affinities)), 
+                       affinity_j_i=c(t(corr_high_dimensional_pairwise_affinities)), 
+                       number_of_points=number_of_points),
+                nrow=number_of_points,
+                ncol=number_of_points,
+                byrow=TRUE))
   
 }
 
