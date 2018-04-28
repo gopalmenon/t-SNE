@@ -33,6 +33,21 @@ get_un_normalized_similarity_j_to_i <- function(point_j_index, point_i_index, hi
   
 }
 
+## Get similarity of point j to point i in low dimensions
+## point_j_index: index of point j in the data array
+## point_i_index: index of point i in the data array
+## low_dimensional_data: data that will be visualized
+##
+## Will return the un-normalized similarity of point j to point i
+get_un_normalized_similarity_j_to_i_low_dimension <- function(point_j_index, point_i_index, low_dimensional_data) {
+  
+  if (point_j_index == point_i_index) {
+    return(0.0)
+  } else {
+    return(1 / (1 + sum((low_dimensional_data[point_i_index, ] - low_dimensional_data[point_j_index])^2)))
+  }
+  
+}
 ## Get entropy at point i for given density
 ## point_i_index: index of point i in the data array
 ## density: density at point i 
@@ -178,13 +193,41 @@ get_high_dimensional_pairwise_affinities <- function(perplexity, high_dimensiona
                                 ncol=length(high_dimensional_data[,1]),
                                 byrow=FALSE)
   
-  un_normalized_pairwise_affinities <- unlist(mapply(get_un_normalized_similarity_j_to_i, 
+  un_normalized_pairwise_affinities <- matrix(mapply(get_un_normalized_similarity_j_to_i, 
                                                      point_j_index=c(t(point_j_index)), 
                                                      point_i_index=c(t(point_i_index)),
                                                      high_dimensional_data=list(high_dimensional_data),
-                                                     c(t(density_at_i_matrix))))
+                                                     c(t(density_at_i_matrix))),
+                                              nrow=length(high_dimensional_data[,1]),
+                                              ncol=length(high_dimensional_data[,1]))
   
-  return(un_normalized_pairwise_affinities)
+  return(un_normalized_pairwise_affinities/rowSums(un_normalized_pairwise_affinities))
   
+}
+
+## Get low dimensional pairwise affinities
+## low_dimensional_data: data that will be visualized
+##
+## Will return low dimensional pairwise affinities
+get_low_dimensional_pairwise_affinities <- function(low_dimensional_data) {
+  
+  point_i_index <- matrix(data=rep(seq(1:length(low_dimensional_data[,1])),length(low_dimensional_data[,1])),
+                          nrow=length(low_dimensional_data[,1]),
+                          ncol=length(low_dimensional_data[,1]),
+                          byrow=FALSE)
+  
+  point_j_index <- matrix(data=rep(seq(1:length(low_dimensional_data[,1])),length(low_dimensional_data[,1])),
+                          nrow=length(low_dimensional_data[,1]),
+                          ncol=length(low_dimensional_data[,1]),
+                          byrow=TRUE)
+
+  un_normalized_pairwise_affinities <- matrix(mapply(get_un_normalized_similarity_j_to_i_low_dimension, 
+                                                     point_j_index=c(t(point_j_index)), 
+                                                     point_i_index=c(t(point_i_index)),
+                                                     low_dimensional_data=list(low_dimensional_data)),
+                                              nrow=length(low_dimensional_data[,1]),
+                                              ncol=length(low_dimensional_data[,1]))
+  
+  return(un_normalized_pairwise_affinities/rowSums(un_normalized_pairwise_affinities))
   
 }
