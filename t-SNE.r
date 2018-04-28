@@ -39,9 +39,9 @@ get_un_normalized_similarity_j_to_i <- function(point_j_index, point_i_index, hi
 ## low_dimensional_data: data that will be visualized
 ##
 ## Will return the un-normalized similarity of point j to point i
-get_un_normalized_similarity_j_to_i_low_dimension <- function(point_j_index, point_i_index, low_dimensional_data) {
+get_un_normalized_similarity_j_to_i_low_dimension <- function(point_j_index, point_i_index, low_dimensional_data, do_computation) {
   
-  if (point_j_index == point_i_index) {
+  if (point_j_index == point_i_index || !isTRUE(do_computation)) {
     return(0.0)
   } else {
     return(1 / (1 + sum((low_dimensional_data[point_i_index, ] - low_dimensional_data[point_j_index])^2)))
@@ -220,14 +220,22 @@ get_low_dimensional_pairwise_affinities <- function(low_dimensional_data) {
                           nrow=length(low_dimensional_data[,1]),
                           ncol=length(low_dimensional_data[,1]),
                           byrow=TRUE)
-
+  
+  upper_triangular <- matrix(rep(1, (length(low_dimensional_data[,1]) * length(low_dimensional_data[,1]))), 
+                             nrow=length(low_dimensional_data[,1]), 
+                             ncol=length(low_dimensional_data[,1]))
+  
+  upper_triangular <- upper.tri(upper_triangular, diag = FALSE)
+    
   un_normalized_pairwise_affinities <- matrix(mapply(get_un_normalized_similarity_j_to_i_low_dimension, 
                                                      point_j_index=c(t(point_j_index)), 
                                                      point_i_index=c(t(point_i_index)),
-                                                     low_dimensional_data=list(low_dimensional_data)),
+                                                     low_dimensional_data=list(low_dimensional_data),
+                                                     do_computation=c(t(upper_triangular))),
                                               nrow=length(low_dimensional_data[,1]),
-                                              ncol=length(low_dimensional_data[,1]))
+                                              ncol=length(low_dimensional_data[,1]),
+                                              byrow=TRUE)
   
-  return(un_normalized_pairwise_affinities/rowSums(un_normalized_pairwise_affinities))
+  return(un_normalized_pairwise_affinities/sum(un_normalized_pairwise_affinities))
   
 }
