@@ -44,7 +44,7 @@ get_un_normalized_similarity_j_to_i_low_dimension <- function(point_j_index, poi
   if (point_j_index == point_i_index || !isTRUE(do_computation)) {
     return(0.0)
   } else {
-    return(1 / (1 + sum((low_dimensional_data[point_i_index, ] - low_dimensional_data[point_j_index])^2)))
+    return(1 / (1 + sum((low_dimensional_data[point_i_index, ] - low_dimensional_data[point_j_index, ])^2)))
   }
   
 }
@@ -284,5 +284,49 @@ get_low_dimensional_pairwise_affinities <- function(low_dimensional_data) {
                                               byrow=TRUE)
   
   return(un_normalized_pairwise_affinities/sum(un_normalized_pairwise_affinities))
+  
+}
+
+## Get gradient of KL Divergence between high and low dimensional pairwise affinities at a particular point
+## point_i_index: point at which gradient is to be computed
+## high_dimensional_pairwise_affinities: upper triangular matrix of high dimensional symmetrized pairwise affinities
+## low_dimensional_pairwise_affinities: upper triangular matrix of low dimensional symmetrized pairwise affinities
+##
+## Will return low dimensional pairwise affinities
+get_gradient_at_point_i <- function(point_i_index, high_dimensional_pairwise_affinities, low_dimensional_pairwise_affinities) {
+  
+  number_of_points <- length(low_dimensional_pairwise_affinities[1, ])
+  
+  pairwise_affinity_points <- matrix(rep(NA, (number_of_points * number_of_points)), 
+                             nrow=number_of_points, 
+                             ncol=number_of_points)
+  
+  # Pairwise affinity point to be used for gradient at point i
+  if (point_i_index < number_of_points) {
+    pairwise_affinity_points[point_i_index, seq(point_i_index + 1, number_of_points)] <- 1
+    affinities_used_2 <- seq(point_i_index + 1, number_of_points)
+  } else {
+    affinities_used_2 <- numeric()
+  }
+  
+  if (point_i_index > 1) {
+    pairwise_affinity_points[seq(1, point_i_index - 1), point_i_index] <- 1
+    affinities_used_1 <- seq(1, point_i_index - 1)
+   } else {
+    affinities_used_1 <- numeric()
+   }
+  
+  affinities_used <- c(affinities_used_1, affinities_used_2)
+  
+  # Compute gradient
+  Pij_Qij <- high_dimensional_pairwise_affinities[!is.na(pairwise_affinity_points)] - 
+    low_dimensional_pairwise_affinities[!is.na(pairwise_affinity_points)]
+  
+  Yi_Yj <- low_dimensional_data[rep(point_i_index, number_of_points - 1),] - 
+    low_dimensional_data[affinities_used, ]
+  
+  gradient_at_point_i <- Pij_Qij * Yi_Yj / (1 + rowSums(Yi_Yj^2))
+  
+  return(4 * colSums(gradient_at_point_i))
   
 }
