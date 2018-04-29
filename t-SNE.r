@@ -3,6 +3,11 @@ library("MASS")
 INITIAL_SOLUTION_VARIANCE = 0.0001
 INITIAL_DENSITY = 1
 DENSITY_PRECISION = 0.1
+NUMBER_OF_ITERATIONS = 1000
+INITIAL_LEARNING_RATE = 100
+LEARNING_RATE_NORMALIZER = 200
+INITIAL_MOMENTUM = 0.5
+FINAL_MOMENTUM = 0.8
 
 ## Get normally distributed initial solution
 ## number_of_points: size of data
@@ -116,7 +121,6 @@ get_density_range <- function(perplexity, point_i_index, high_dimensional_data) 
   return(density_range)
   
 }
-
 
 ## Get density corresponding to perplexity at point i 
 ## perplexity: required perplexity 
@@ -292,7 +296,7 @@ get_low_dimensional_pairwise_affinities <- function(low_dimensional_data) {
 ## high_dimensional_pairwise_affinities: upper triangular matrix of high dimensional symmetrized pairwise affinities
 ## low_dimensional_pairwise_affinities: upper triangular matrix of low dimensional symmetrized pairwise affinities
 ##
-## Will return low dimensional pairwise affinities
+## Will return the gradient of KL Divergence between high and low dimensional pairwise affinities at a particular point
 get_gradient_at_point_i <- function(point_i_index, high_dimensional_pairwise_affinities, low_dimensional_pairwise_affinities) {
   
   number_of_points <- length(low_dimensional_pairwise_affinities[1, ])
@@ -330,3 +334,40 @@ get_gradient_at_point_i <- function(point_i_index, high_dimensional_pairwise_aff
   return(4 * colSums(gradient_at_point_i))
   
 }
+
+## Get the learning rate for the current iteration
+## initial_learning_rate: learning rate for first iteration
+## iteration_number: iteration number
+## learning_rate_normalizer: how fast to decay the learning rate
+## decay_learning_rate: should the frate decay or stay constant
+##
+## Will return the learning rate for the current iteration
+get_learning_rate <- function(initial_learning_rate, iteration_number, learning_rate_normalizer, decay_learning_rate) {
+  
+  if (isTRUE(decay_learning_rate)) {
+    return(initial_learning_rate/(1 + initial_learning_rate * (iteration_number - 1) / learning_rate_normalizer))
+  } else {
+    return(initial_learning_rate)
+  }
+  
+}
+
+
+## Get the next estimate for the low dimensional point by doing a gradient descent
+## previous_low_dimensional_point_estimate: previous estimate for the low dimensional point
+## current_learning_rate: learning rate at the current step
+## kl_divergence_gradient_at_point: gradient at the point
+## momentum_term: momentum for convergence
+## before_previous_low_dimensional_point_estimate: estimate for the low dimensional point two steps before
+##
+## Will return the next estimate for the low dimensional point
+get_next_low_dimensional_point_estimate <- function(previous_low_dimensional_point_estimate, current_learning_rate, kl_divergence_gradient_at_point, momentum_term, before_previous_low_dimensional_point_estimate) {
+  
+  return(previous_low_dimensional_point_estimate +
+           current_learning_rate * kl_divergence_gradient_at_point +
+           momentum_term * (ifelse(all(previous_low_dimensional_point_estimate == 0) && all(before_previous_low_dimensional_point_estimate == 0),
+                                   rep(0, length(previous_low_dimensional_point_estimate)),
+                                   (previous_low_dimensional_point_estimate - before_previous_low_dimensional_point_estimate))))
+  
+}
+
