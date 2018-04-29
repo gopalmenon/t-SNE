@@ -3,9 +3,12 @@ library("MASS")
 INITIAL_SOLUTION_VARIANCE = 0.0001
 INITIAL_DENSITY = 1
 DENSITY_PRECISION = 0.1
+DEFAULT_PERPLEXITY = 5
+TARGET_LOW_DIMENSIONALITY = 3
 NUMBER_OF_ITERATIONS = 1000
 INITIAL_LEARNING_RATE = 100
 LEARNING_RATE_NORMALIZER = 200
+DECAY_LEARNING_RATE = TRUE
 INITIAL_MOMENTUM = 0.5
 FINAL_MOMENTUM = 0.8
 
@@ -352,7 +355,6 @@ get_learning_rate <- function(initial_learning_rate, iteration_number, learning_
   
 }
 
-
 ## Get the next estimate for the low dimensional point by doing a gradient descent
 ## previous_low_dimensional_point_estimate: previous estimate for the low dimensional point
 ## current_learning_rate: learning rate at the current step
@@ -361,13 +363,64 @@ get_learning_rate <- function(initial_learning_rate, iteration_number, learning_
 ## before_previous_low_dimensional_point_estimate: estimate for the low dimensional point two steps before
 ##
 ## Will return the next estimate for the low dimensional point
-get_next_low_dimensional_point_estimate <- function(previous_low_dimensional_point_estimate, current_learning_rate, kl_divergence_gradient_at_point, momentum_term, before_previous_low_dimensional_point_estimate) {
+get_next_low_dimensional_point_estimate <- function(previous_low_dimensional_point_estimates, previous_low_dimensional_point_estimate_index, current_learning_rate, kl_divergence_gradient_at_point, momentum_term, before_previous_low_dimensional_point_estimates) {
   
-  return(previous_low_dimensional_point_estimate +
-           current_learning_rate * kl_divergence_gradient_at_point +
-           momentum_term * (ifelse(all(previous_low_dimensional_point_estimate == 0) && all(before_previous_low_dimensional_point_estimate == 0),
-                                   rep(0, length(previous_low_dimensional_point_estimate)),
-                                   (previous_low_dimensional_point_estimate - before_previous_low_dimensional_point_estimate))))
+  return(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] +
+           current_learning_rate * kl_divergence_gradient_at_point[previous_low_dimensional_point_estimate_index, ] +
+           momentum_term * (ifelse(all(before_previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] == 0),
+                                   rep(0, length(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ])),
+                                   (previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] - 
+                                      before_previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ]))))
   
 }
 
+run_t_sne <- function(high_dimensional_data, low_dimensionality=TARGET_LOW_DIMENSIONALITY, perplexity=DEFAULT_PERPLEXITY, number_of_iterations=NUMBER_OF_ITERATIONS, initial_learning_rate=INITIAL_LEARNING_RATE, learning_rate_normalizer=LEARNING_RATE_NORMALIZER, initial_momentum=INITIAL_MOMENTUM, final_momentum=FINAL_MOMENTUM) {
+  
+  # Compute symmetrized pairwise affinities with perplexity
+  high_dimensional_pairwise_affinities <- get_high_dimensional_pairwise_affinities(perplexity=perplexity, high_dimensional_data=high_dimensional_data)
+  
+  # Sample initial solution from a normal distribution
+  previous_low_dimensional_point_estimate <- get_initial_solution(number_of_points=length(high_dimensional_data[, 1]), dimensionality=low_dimensionality)
+  before_previous_low_dimensional_point_estimate <- matrix(rep(0, length(high_dimensional_data[, 1]) * low_dimensionality),
+                                                           nrow=length(high_dimensional_data[, 1]),
+                                                           ncol=low_dimensionality,
+                                                           byrow=TRUE)
+  
+  # Find low dimensional representation using gradient descent
+  for (iteration_counter in 1:number_of_iterations) {
+  
+    # Compute low dimensional affinities
+    low_dimensional_pairwise_affinities <- get_low_dimensional_pairwise_affinities(low_dimensional_data=previous_low_dimensional_point_estimate)
+  
+    # Compute gradient at each point in low dimensions
+    gradient_at_each_low_dimensional_point <- matrix(mapply(get_gradient_at_point_i,
+                                                            point_i_index=rep(1:length(high_dimensional_data[, 1])), 
+                                                            high_dimensional_pairwise_affinities=list(high_dimensional_pairwise_affinities),
+                                                            low_dimensional_pairwise_affinities=list(low_dimensional_pairwise_affinities)),
+                                                     nrow=length(high_dimensional_data[, 1]),
+                                                     ncol=low_dimensionality,
+                                                     byrow=TRUE)
+    
+
+    # Take a step by doing gradient descent
+    learning_rate <- get_learning_rate(initial_learning_rate=initial_learning_rate, iteration_number=iteration_counter, learning_rate_normalizer=learning_rate_normalizer, decay_learning_rate=DECAY_LEARNING_RATE)
+    next_low_dimensional_point_estimate <- matrix(mapply(get_next_low_dimensional_point_estimate,
+                                                         previous_low_dimensional_point_estimates=list(previous_low_dimensional_point_estimate),
+                                                         previous_low_dimensional_point_estimate_index=seq(1:length(high_dimensional_data[, 1])),
+                                                         current_learning_rate=learning_rate,
+                                                         kl_divergence_gradient_at_point=list(gradient_at_each_low_dimensional_point),
+                                                         momentum_term=ifelse(iteration_counter < 250, initial_momentum, final_momentum),
+                                                         before_previous_low_dimensional_point_estimates=list(before_previous_low_dimensional_point_estimate)),
+                                                  nrow=length(high_dimensional_data[, 1]),
+                                                  ncol=low_dimensionality,
+                                                  byrow=TRUE)
+
+    # Save previous values
+    before_previous_low_dimensional_point_estimate <- previous_low_dimensional_point_estimate
+    previous_low_dimensional_point_estimate <- next_low_dimensional_point_estimate
+
+  }
+  
+  return(next_low_dimensional_point_estimate)
+  
+}
