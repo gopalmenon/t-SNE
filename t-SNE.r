@@ -1,7 +1,7 @@
 library("MASS")
 
 INITIAL_SOLUTION_VARIANCE = 0.0001
-INITIAL_DENSITY = 1
+INITIAL_DENSITY = 3162
 DENSITY_PRECISION = 0.1
 DEFAULT_PERPLEXITY = 5
 TARGET_LOW_DIMENSIONALITY = 3
@@ -72,8 +72,9 @@ get_entropy_at_i <- function(point_i_index, density, high_dimensional_data) {
   
   normalized_similarity_at_i <- unlist(un_normalized_similarity_at_i) / sum(unlist(un_normalized_similarity_at_i))
 
-  entropy_at_i <- sum(-normalized_similarity_at_i * log2(normalized_similarity_at_i))
+  entropy_at_i <- sum(-normalized_similarity_at_i * ifelse(normalized_similarity_at_i != 0, log2(normalized_similarity_at_i), 0))
 
+  return(entropy_at_i)
 }
 
 ## Get density range corresponding to perplexity at point i 
@@ -195,7 +196,7 @@ get_high_dimensional_pairwise_affinities <- function(perplexity, high_dimensiona
                           byrow=TRUE)
   
   density_at_i <- get_density_at_each_point(perplexity, high_dimensional_data)
-  density_at_i_matrix <- matrix(rep(den, length(high_dimensional_data[,1])), 
+  density_at_i_matrix <- matrix(rep(density_at_i, length(high_dimensional_data[,1])), 
                                 nrow=length(high_dimensional_data[,1]), 
                                 ncol=length(high_dimensional_data[,1]),
                                 byrow=FALSE)
@@ -231,6 +232,7 @@ get_symmetrized_affinity <- function(affinity_i_j, affinity_j_i, number_of_point
 
 ## Get symmetrized high dimensional pairwise affinities
 ## high_dimensional_pairwise_affinities: high dimensional pairwise affinities
+## number_of_points: number of data points
 ##
 ## Will return symmetrized high dimensional pairwise affinities defined as Pij = (Pj|i + Pi|j)/2n
 get_symmetrized_high_dimensional_pairwise_affinities <- function(high_dimensional_pairwise_affinities, number_of_points) {
@@ -241,10 +243,10 @@ get_symmetrized_high_dimensional_pairwise_affinities <- function(high_dimensiona
   
   
   lower_triangular <- matrix(rep(1, (number_of_points * number_of_points)), 
-                             nrow=length(low_dimensional_data[,1]), 
-                             ncol=length(low_dimensional_data[,1]))
+                             nrow=number_of_points, 
+                             ncol=number_of_points)
   
-  lower_triangular <- lower.tri(upper_triangular, diag = FALSE)
+  lower_triangular <- lower.tri(lower_triangular, diag = FALSE)
   
   high_dimensional_pairwise_affinities[lower_triangular] <- NA
   corr_high_dimensional_pairwise_affinities[lower_triangular] <- NA
@@ -298,9 +300,10 @@ get_low_dimensional_pairwise_affinities <- function(low_dimensional_data) {
 ## point_i_index: point at which gradient is to be computed
 ## high_dimensional_pairwise_affinities: upper triangular matrix of high dimensional symmetrized pairwise affinities
 ## low_dimensional_pairwise_affinities: upper triangular matrix of low dimensional symmetrized pairwise affinities
+## low_dimensional_points: current estimate of low dimensional points
 ##
 ## Will return the gradient of KL Divergence between high and low dimensional pairwise affinities at a particular point
-get_gradient_at_point_i <- function(point_i_index, high_dimensional_pairwise_affinities, low_dimensional_pairwise_affinities) {
+get_gradient_at_point_i <- function(point_i_index, high_dimensional_pairwise_affinities, low_dimensional_pairwise_affinities, low_dimensional_points) {
   
   number_of_points <- length(low_dimensional_pairwise_affinities[1, ])
   
@@ -329,8 +332,8 @@ get_gradient_at_point_i <- function(point_i_index, high_dimensional_pairwise_aff
   Pij_Qij <- high_dimensional_pairwise_affinities[!is.na(pairwise_affinity_points)] - 
     low_dimensional_pairwise_affinities[!is.na(pairwise_affinity_points)]
   
-  Yi_Yj <- low_dimensional_data[rep(point_i_index, number_of_points - 1),] - 
-    low_dimensional_data[affinities_used, ]
+  Yi_Yj <- low_dimensional_points[rep(point_i_index, number_of_points - 1),] - 
+    low_dimensional_points[affinities_used, ]
   
   gradient_at_point_i <- Pij_Qij * Yi_Yj / (1 + rowSums(Yi_Yj^2))
   
@@ -396,7 +399,8 @@ run_t_sne <- function(high_dimensional_data, low_dimensionality=TARGET_LOW_DIMEN
     gradient_at_each_low_dimensional_point <- matrix(mapply(get_gradient_at_point_i,
                                                             point_i_index=rep(1:length(high_dimensional_data[, 1])), 
                                                             high_dimensional_pairwise_affinities=list(high_dimensional_pairwise_affinities),
-                                                            low_dimensional_pairwise_affinities=list(low_dimensional_pairwise_affinities)),
+                                                            low_dimensional_pairwise_affinities=list(low_dimensional_pairwise_affinities),
+                                                            low_dimensional_points=list(previous_low_dimensional_point_estimate)),
                                                      nrow=length(high_dimensional_data[, 1]),
                                                      ncol=low_dimensionality,
                                                      byrow=TRUE)
