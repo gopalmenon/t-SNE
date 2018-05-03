@@ -1,14 +1,14 @@
 library("MASS")
 
 INITIAL_SOLUTION_VARIANCE = 0.0001
-INITIAL_DENSITY = 3162
+INITIAL_DENSITY = 1
 DENSITY_PRECISION = 0.1
-DEFAULT_PERPLEXITY = 5
+DEFAULT_PERPLEXITY = 35
 TARGET_LOW_DIMENSIONALITY = 3
-NUMBER_OF_ITERATIONS = 1000
-INITIAL_LEARNING_RATE = 100
+NUMBER_OF_ITERATIONS = 2000
+INITIAL_LEARNING_RATE = 3000
 LEARNING_RATE_NORMALIZER = 200
-DECAY_LEARNING_RATE = TRUE
+DECAY_LEARNING_RATE = FALSE
 INITIAL_MOMENTUM = 0.5
 FINAL_MOMENTUM = 0.8
 
@@ -368,8 +368,8 @@ get_learning_rate <- function(initial_learning_rate, iteration_number, learning_
 ## Will return the next estimate for the low dimensional point
 get_next_low_dimensional_point_estimate <- function(previous_low_dimensional_point_estimates, previous_low_dimensional_point_estimate_index, current_learning_rate, kl_divergence_gradient_at_point, momentum_term, before_previous_low_dimensional_point_estimates) {
   
-  return(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] +
-           current_learning_rate * kl_divergence_gradient_at_point[previous_low_dimensional_point_estimate_index, ] +
+  return(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] -
+           current_learning_rate * kl_divergence_gradient_at_point[previous_low_dimensional_point_estimate_index, ] -
            momentum_term * (ifelse(all(before_previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] == 0),
                                    rep(0, length(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ])),
                                    (previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] - 
@@ -378,6 +378,8 @@ get_next_low_dimensional_point_estimate <- function(previous_low_dimensional_poi
 }
 
 run_t_sne <- function(high_dimensional_data, low_dimensionality=TARGET_LOW_DIMENSIONALITY, perplexity=DEFAULT_PERPLEXITY, number_of_iterations=NUMBER_OF_ITERATIONS, initial_learning_rate=INITIAL_LEARNING_RATE, learning_rate_normalizer=LEARNING_RATE_NORMALIZER, initial_momentum=INITIAL_MOMENTUM, final_momentum=FINAL_MOMENTUM) {
+  
+  set.seed(0)
   
   # Compute symmetrized pairwise affinities with perplexity
   high_dimensional_pairwise_affinities <- get_high_dimensional_pairwise_affinities(perplexity=perplexity, high_dimensional_data=high_dimensional_data)

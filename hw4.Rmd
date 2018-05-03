@@ -1,0 +1,105 @@
+---
+title: 'CS6190: Probabilistic Modeling Project'
+author: "Gopal Menon"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{amssymb}
+- \usepackage{dirtytalk}
+- \usepackage{algorithm}
+- \usepackage[noend]{algpseudocode}
+- \algdef{SE}{Begin}{End}{\textbf{begin}}{\textbf{end}}
+- \DeclareMathOperator{\Unif}{Unif}
+- \DeclareMathOperator{\E}{E}
+- \DeclareMathOperator{\Var}{Var}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\hrule
+
+\section{Project Description}
+I implemented a dimensionality reduction algorithm called t-SNE (t-Distributed Stochastic Neighbor Embedding) \cite{paper} that is used for visualizing high dimensionality data sets. It essentially works by mapping points in high dimensions to points in low dimensions by minimizing the KL Divergence between two probability distributions. The first distribution is for the probability of picking a point as a neighbor of another point in high dimensional space and the second one is for the corresponding distribution in low dimensional space. The algorithm works by starting with a random distribution of points in low dimensions and does a gradient descent on the KL Divergence gradient using a learning rate and a momentum term. The latter used to speed up optimization and hopefully avoid local minima. 
+
+
+\section{t-SNE short description}
+
+First high-dimensional distances between points are converted to conditional probabilities that represent similarities \cite{paper}. The similarity of datapoint $x_j$ to datapoint $x_i$ is the conditional probability $p_{j|i}$ that $x_i$ would pick $x_j$ as its neighbor if neighbors were picked in proportion to their probability density under a Gaussian centered at $x_i$. The conditional probability $p_{j|i}$ is given by
+$$
+p_{j|i} = \frac{exp \left (\frac{-\Vert x_i-x_j \Vert^2}{2\sigma_i^2}\right)}{\sum_{k\neq i}exp \left (\frac{-\Vert x_i-x_k \Vert^2}{2\sigma_i^2}\right)}
+$$
+where $\sigma_i$ is the variance of the Gaussian that is centered on datapoint $x_i$. $p_{i|i}$ is set to zero.
+
+A Student t-distribution with one degree of freedom is used as the low-dimensional distribution. The joint probability $q_{ij}$ in the low-dimensional representation is defined as 
+$$
+q_{ij} = \frac{(1+ \Vert y_i-y_j \Vert ^2)^{-1}}{\sum_{k \neq l} (1+ \Vert y_k-y_l \Vert ^2)^{-1}}
+$$
+$q_{i|i}$ is set to zero.
+
+For each point high-dimensional point $x_i$ we need to select the variance $\sigma_i$ of the Gaussian that is centered over it. This is done by doing a binary search for the value of $\sigma_i$ that produces a $P_i$ with a fixed perplexity that is specified by the user. The perplexity is defined as
+$$
+Perp(P_i) = 2^{H(P_i)}
+$$
+where $H(P_i)$ is the entropy of $P_i$ defined as
+$$
+H(P_i) = -\sum_jp_{j|i} \log_2 p_{j|i}
+$$
+The perplexity can be interpreted as a smooth measure of the effective number of neighbors.
+
+The gradient of the KL Divergence between the high dimensional symmetrized conditional probabilities $p_{ij} = \frac{p_{j|i}+p_{i|j}}{2n}$ and the low dimensional joint probability $q_{ij}$ is given by
+$$
+\frac{\partial C}{\partial y_i}=4\sum_j (p_{ij}-q_{ij})(y_i-y_j)(1+ \Vert y_i-y_j \Vert ^2)^{-1}
+$$
+For a detailed description, please refer to the t-SNE paper \cite{paper}.
+
+\section{t-SNE Algorithm}
+\begin{minipage}{\linewidth}
+  \begin{algorithm}[H]
+    \caption{t-Distributed Stochastic Neighbor Embedding}\label{tSNE}
+    \begin{algorithmic}[1]
+      \Procedure{t-SNE}{}
+        \State \textbf{Data:} data set $X=\{x_1, x_2,\ldots,x_n\}$,
+      	\State cost function parameters: perplexity \textit{Perp}
+      	\State optimization parameters: number of iterations $T$, learning rate $\eta$, momentum $\alpha(t)$
+        \State \textbf{Result:} low-dimensional data representation $\gamma^{(T)}=\{y_1, y_2,\ldots,y_n\}$,
+        \Begin
+          \State compute pairwise affinities $p_{j|i}$ with perplexity \textit{Perp}
+          \State set $p_{ij}=\frac{p_{j|i}+p_{i|j}}{2n}$
+          \State sample initial solution $\gamma^{(0)}=\{y_1, y_2,\ldots,y_n\} \sim \mathcal{N}(0, 10^{-4}I) $
+          \For {$t=1 \text{ to } T $}
+            \State compute low-dimensional affinities $q_{ij}$
+            \State compute gradient $\frac{\partial C}{\partial \gamma}$
+            \State set $\gamma^{(t)}=\gamma^{t-1} + \eta \frac{\partial C}{\partial \gamma} + \alpha(t)(\gamma^{(t-1)}-\gamma^{(t-2)})$
+          \EndFor
+        \End
+      \EndProcedure
+    \end{algorithmic}
+  \end{algorithm}
+\end{minipage}
+
+\section{Implementation Details and Issues}
+
+The algorithm shown above was implemented and needed tuning of the hyperparameters for perplexity, learning rate and momentum for getting good results. In addition to that, the equation for the next low dimensional estimate $\gamma^{(t)}=\gamma^{t-1} + \eta \frac{\partial C}{\partial \gamma} + \alpha(t)(\gamma^{(t-1)}-\gamma^{(t-2)})$, was changed so that the second term is subtracted. I am not sure if that was a typo in the paper or not, but it gave me better results and it also made sense to take a step in the direction of the negative gradient.
+
+
+\section{Experimental results}
+
+```{r irisplot, echo=FALSE, message=FALSE, fig.align='center'}
+source("t-SNE.r")
+library(rgl)
+iris3dplot <- run_t_sne(high_dimensional_data=iris[c(1:3,51:53,101:103),-5])
+plot3d(iris3dplot[,1],iris3dplot[,2],iris3dplot[,3],col=c(rep(1,3), rep(2,3),rep(3,3)), main="Iris Clusters")
+```
+
+\begin{thebibliography}{9}
+
+\bibitem{paper} Maaten, Laurens van der, and Geoffrey Hinton. \say{Visualizing data using t-SNE.}\textit{ Journal of machine learning research}, 9.Nov (2008): 2579-2605.
+
+\end{thebibliography}
