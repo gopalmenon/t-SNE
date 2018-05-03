@@ -369,7 +369,7 @@ get_learning_rate <- function(initial_learning_rate, iteration_number, learning_
 get_next_low_dimensional_point_estimate <- function(previous_low_dimensional_point_estimates, previous_low_dimensional_point_estimate_index, current_learning_rate, kl_divergence_gradient_at_point, momentum_term, before_previous_low_dimensional_point_estimates) {
   
   return(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] -
-           current_learning_rate * kl_divergence_gradient_at_point[previous_low_dimensional_point_estimate_index, ] -
+           current_learning_rate * kl_divergence_gradient_at_point[previous_low_dimensional_point_estimate_index, ] +
            momentum_term * (ifelse(all(before_previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] == 0),
                                    rep(0, length(previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ])),
                                    (previous_low_dimensional_point_estimates[previous_low_dimensional_point_estimate_index, ] - 
